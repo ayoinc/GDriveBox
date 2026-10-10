@@ -25,7 +25,8 @@ Cycle time = Done date − Started date (calendar days). Track it per class.
 | Verify WIP limit 2 vs 1 | 2 (0.64) | Policy above; revisit with two weeks of data. |
 | Sign-in reuses the Safari Google session vs. a private (ephemeral) session | reuse (0.64) | Resolved 2026-10-10: reuse (user asked to plow through decisions; Jev's lean taken). |
 | Commit each card to git when it reaches Done | no lean (0.48) | Resolved 2026-10-10: commit per card, Conventional Commits, pushed to public `ayoinc/GDriveBox` (user chose a public repo). |
-| Create the File Provider extension's provisioning profile now | no (0.27) | Deferred to S-07, when the extension exists. |
+| Create the File Provider extension's provisioning profile now | no (0.27) | Resolved 2026-10-10 in S-07: created "GDriveBox FileProvider macOS Development". |
+| File Provider domain identifier: fixed `google` vs the account email | email (0.59, abstain) | Resolved 2026-10-10: fixed `google`, display name "GDriveBox" (card spec; one account at a time). Folder: `~/Library/CloudStorage/GDriveBox-GDriveBox`. |
 
 ## Accounts and identifiers
 
@@ -35,7 +36,7 @@ Cycle time = Done date − Started date (calendar days). Track it per class.
 | App IDs | `io.github.ayoinc.GDriveBox`, `io.github.ayoinc.GDriveBox.FileProvider` (App Groups enabled) |
 | App group / keychain access group | `group.io.github.ayoinc.GDriveBox` |
 | App Store Connect | GDriveBox, macOS, Apple ID `6821382130`, SKU `gdrivebox-macos`, English (U.K.) |
-| Dev signing | `Apple Development: Ayodele Ajayi (747Y7L4FPC)` (key only in login keychain); this Mac registered; profile "GDriveBox macOS Development" (app only) |
+| Dev signing | `Apple Development: Ayodele Ajayi (747Y7L4FPC)` (key only in login keychain); this Mac registered (device "MacBook Pro M5 Pro GDriveBox dev"); profiles "GDriveBox macOS Development" (app, `98073db9-…`) and "GDriveBox FileProvider macOS Development" (extension, `b31757c0-a86c-4de6-b7ac-7f4362c96f04`, portal ID `VW62R42V53`, expires 2027-10-10) |
 | Google Cloud | project `gdrivebox-ayoinc`; Drive API enabled; OAuth app **In production**, unverified (100-user lifetime cap, "unverified app" screen) |
 | Google OAuth client (iOS type, public) | `473211601147-pdhd9n52ki3832vaddcsaceo8bktgk4p.apps.googleusercontent.com` |
 | Website | https://gdrivebox.app/ (also www): Cloudflare Worker `gdrivebox-site` serving `docs/` as static assets (`site/wrangler.jsonc`, deploy: `cd site && npx wrangler deploy`); binding `EMAIL` (Send Email) reserved, unused. The old GitHub Pages URLs redirect to gdrivebox.app. |
@@ -58,6 +59,14 @@ Cycle time = Done date − Started date (calendar days). Track it per class.
 
 - **S-06 Menu-bar sign-in + debug listing** · Standard · started 2026-10-10 · waiting on the human
   - Built and running signed (`build/GDriveBox.app`). Remaining AC: the user signs in once with a passkey and once with another MFA method; the window lists the My Drive root and storage usage.
+- **S-07/S-08 Finder folder: domain, enumeration, on-demand download** · Standard · started 2026-10-10 · waiting on the human
+  - Done: `GDriveBoxFileProvider.appex` (`NSFileProviderReplicatedExtension`, SwiftPM executable entering `NSExtensionMain`) embedded and signed with its own profile; `pluginkit` lists it; app registers domain `google` ("GDriveBox") on sign-in/launch/Refresh → `~/Library/CloudStorage/GDriveBox-GDriveBox` exists. `item(for:)` = `files.get`, folder enumerator pages `files.list` via `NSFileProviderPage`, `fetchContents` = `files.get?alt=media` streamed to a temp file; Google-native docs served as generated `.webloc` links (Jev act 0.98); read-only (capabilities read/enumerate only; create/modify → `NSFeatureUnsupportedError`, delete → `deletionRejected`). Extension reads tokens from the app-group keychain item. 15 DriveAPI + 10 extension tests.
+  - Remaining AC: macOS lists the domain as "user-disabled" until the user turns GDriveBox on (System Settings › General › Login Items & Extensions › File Providers; the window shows a banner + button). Then: `ls ~/Library/CloudStorage/GDriveBox-GDriveBox` lists My Drive root dataless; opening a file downloads it.
+  - Not yet: remote changes (fixed sync anchor until S-10), writes (S-09).
+- **S-12a Sign out** · Standard · started 2026-10-10 · waiting on the human
+  - Done: "Sign Out" in the menu and the window header → revoke at `oauth2.googleapis.com/revoke` (400 `invalid_token` = already revoked; offline → local sign-out continues with a notice, Jev act 0.98), delete the keychain item, `NSFileProviderManager.remove(…, mode: .removeAll)`, reset UI. 4 revocation tests.
+  - Remaining AC: exercise it on the user's real session (signs them out, so left to the user): domain and folder gone, app shows "Not signed in".
+  - Verify holds 3 cards (limit 2): all three wait on the same human session.
 
 ## In Progress (WIP 2)
 
@@ -70,12 +79,10 @@ _(empty)_
 ## Backlog
 
 ### Milestone 2+
-- **S-07 File Provider domain + folder enumeration** · Standard
-- **S-08 On-demand download (`fetchContents`)** · Standard
 - **S-09 Uploads + create/modify/delete** · Standard — multipart ≤ 5 MB, resumable above; delete → Drive Trash.
 - **S-10 Remote change polling** · Standard — 60 s + wake/network/activation; extension alone advances the pageToken.
 - **S-11 Conflicts: keep both** · Standard
-- **S-12 Onboarding, status, sign out (revoke)** · Standard — sign-out must delete tokens, the local file list and downloaded copies (promised in the privacy policy).
+- **S-12 Onboarding, status** · Standard — sign-out split out as S-12a.
 - **S-13 Release pipeline** · Standard — Developer ID, notarization, Sparkle, Homebrew cask (arm64, macOS ≥ 15).
 - **I-01 CI** · Intangible — GitHub Actions `swift build` + `swift test` on an Apple-silicon runner.
 - **I-02 CONTRIBUTING** · Intangible (README shipped with P-01)
