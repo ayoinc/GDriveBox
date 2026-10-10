@@ -49,28 +49,27 @@ Cycle time = Done date − Started date (calendar days). Track it per class.
 | S-02 DriveAPI client — 10 Swift Testing tests (incl. 11-case retry classification); live smoke vs `www.googleapis.com` (real 401 parsed, single forced refresh). Authenticated listing exercised in S-06 (needs B-03). | Standard | 2026-10-10 | 2026-10-10 |
 | S-03 DriveAuth — 8 Swift Testing tests (stubbed token endpoint through AppAuth's HTTP stack); smoke: login-keychain round trip, unsigned data-protection keychain → `-34018`, refresh against real `oauth2.googleapis.com` surfaces `invalid_client`. Interactive passkey/MFA sign-in and a successful real refresh exercised in S-06. | Standard | 2026-10-10 | 2026-10-10 |
 | A-01 Apple setup — identifiers, app group, App Store Connect record, dev certificate, device, dev profile (all verified in the portal / decoded profile) | Standard | 2026-10-10 | 2026-10-10 |
-| G-01 Google OAuth — project, Drive API, branding, scopes, iOS client, published to production (Audience page shows "In production") | Standard | 2026-10-10 | 2026-10-10 |
-| P-01 Public repo + website — `ayoinc/GDriveBox` public; Pages serves homepage, privacy policy (Limited Use statement), terms (HTTP 200) | Standard | 2026-10-10 | 2026-10-10 |
+| G-01 Google OAuth — project, Drive API, branding, scopes, iOS client, published to production (Audience page shows "In production"); branding now on gdrivebox.app (home, `/privacy`, `/terms`, authorised domain `gdrivebox.app`, developer contact `support@gdrivebox.app`) | Standard | 2026-10-10 | 2026-10-10 |
+| P-01 Public repo + website — `ayoinc/GDriveBox` public; homepage, privacy policy (Limited Use statement), terms | Standard | 2026-10-10 | 2026-10-10 |
+| W-01 gdrivebox.app — Worker `gdrivebox-site` on apex + www (all URLs 200), contact `support@gdrivebox.app`, old GitHub Pages URLs redirect | Standard | 2026-10-10 | 2026-10-10 |
+| S-05′ App bundle without Xcode — `Scripts/build-app.sh` (shellcheck clean) builds arm64 `GDriveBox.app`; ad-hoc and profile-signed builds verify and launch; signed build restores from the app-group keychain without `-34018` | Standard | 2026-10-10 | 2026-10-10 |
 
 ## Verify
 
-_(empty)_
+- **S-06 Menu-bar sign-in + debug listing** · Standard · started 2026-10-10 · waiting on the human
+  - Built and running signed (`build/GDriveBox.app`). Remaining AC: the user signs in once with a passkey and once with another MFA method; the window lists the My Drive root and storage usage.
 
 ## In Progress (WIP 2)
 
-- **S-05′ App bundle without Xcode** · Standard · started 2026-10-10
-  - AC: SwiftPM `GDriveBoxApp` target; `Scripts/build-app.sh` assembles an arm64 `GDriveBox.app`, ad-hoc by default, or signed with `SIGN_IDENTITY` + `PROVISIONING_PROFILE` (entitlements: sandbox, network client, app group, application identifier, team id); room for `.appex` under `Contents/PlugIns`.
-- **S-06 Menu-bar sign-in + debug listing** · Standard · started 2026-10-10
-  - AC: signed app restores/stores the session in the app-group keychain without `-34018`; the user signs in once with a passkey and once with another MFA method; debug window lists the My Drive root and storage usage.
+_(empty)_
 
 ## Ready
 
-_(empty)_
+- **S-04 MetadataStore** · Standard — GRDB SQLite (WAL) in the App Group: items, sync_state (changes pageToken), uploads.
 
 ## Backlog
 
 ### Milestone 2+
-- **S-04 MetadataStore** · Standard — GRDB SQLite (WAL) in the App Group: items, sync_state (changes pageToken), uploads.
 - **S-07 File Provider domain + folder enumeration** · Standard
 - **S-08 On-demand download (`fetchContents`)** · Standard
 - **S-09 Uploads + create/modify/delete** · Standard — multipart ≤ 5 MB, resumable above; delete → Drive Trash.
@@ -82,10 +81,12 @@ _(empty)_
 - **I-02 CONTRIBUTING** · Intangible (README shipped with P-01)
 - **I-03 swift-format config** · Intangible
 - **I-04 Test-build flake** · Intangible — with Command Line Tools only, `swift test` (default `swiftbuild` backend) alternates: one run fails with "plugin for module 'TestingMacros' not found", the next passes. `--build-system native` cannot find `Testing` at all. Workaround: re-run.
+- **I-05 SwiftUI macros without Xcode** · Intangible — the macOS 27 SDK makes `@State` (and `@Entry`, `#Preview`) macros whose plugin ships only with Xcode; the app uses `State(initialValue:)` directly. Revisit if Command Line Tools start shipping SwiftUIMacros.
 
 ## Blocked
 
-- **B-04 Google restricted-scope verification** (owner: agent + human) — needs: Search Console ownership of `gdrivebox.app` (URL-prefix property, HTML file served from `docs/`), a demo video of the working app showing the consent flow and Drive use (needs S-06/S-08), and the "Backup and sync" scope justification. Until verified: "unverified app" screen and a 100-user lifetime cap.
+- **B-04 Google restricted-scope verification** (owner: human, then agent) — needs: Search Console ownership of `gdrivebox.app` (automated clicks are ignored by Search Console inside the cmux browser, so the human adds a Domain property and approves Cloudflare's DNS verification), a demo video of the working app showing the consent flow and Drive use (needs S-06/S-08), and the "Backup and sync" scope justification. Until verified: "unverified app" screen and a 100-user lifetime cap.
+- **B-06 Google "User support email" on @gdrivebox.app** (owner: human) — the field only accepts the signed-in Google account or a Google Group it manages (today: the owner's Gmail). Option: create a Google account for `support@gdrivebox.app` (mail already forwards), add it as project Owner, then select it.
 - **B-05 Developer ID Application certificate** (owner: agent, in S-13) — needed to sign builds for other people's Macs; Account Holder role confirmed.
 
 ## Dropped
