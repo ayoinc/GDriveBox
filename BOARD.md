@@ -54,19 +54,16 @@ Cycle time = Done date − Started date (calendar days). Track it per class.
 | P-01 Public repo + website — `ayoinc/GDriveBox` public; homepage, privacy policy (Limited Use statement), terms | Standard | 2026-10-10 | 2026-10-10 |
 | W-01 gdrivebox.app — Worker `gdrivebox-site` on apex + www (all URLs 200), contact `support@gdrivebox.app`, old GitHub Pages URLs redirect | Standard | 2026-10-10 | 2026-10-10 |
 | S-05′ App bundle without Xcode — `Scripts/build-app.sh` (shellcheck clean) builds arm64 `GDriveBox.app`; ad-hoc and profile-signed builds verify and launch; signed build restores from the app-group keychain without `-34018` | Standard | 2026-10-10 | 2026-10-10 |
+| S-07/S-08 Finder folder — read-only `NSFileProviderReplicatedExtension` (`GDriveBoxFileProvider.appex`, own dev profile, linked with `-e _NSExtensionMain` and no Swift `main`: a forwarding `main` recursed through ExtensionFoundation and crashed). App registers domain `google` ("GDriveBox") on sign-in/launch/Refresh and shows a System Settings banner while macOS has it disabled. `item(for:)` = `files.get`; folders page `files.list` via `NSFileProviderPage`; `fetchContents` = `files.get?alt=media` streamed to a temp file; Google-native docs → generated `.webloc` links (Jev act 0.98); create/modify → `NSFeatureUnsupportedError`, delete → `deletionRejected`. Live on the owner's Drive: `~/Library/CloudStorage/GDriveBox-GDriveBox` lists the 328 root items `dataless` (0 B on disk), subfolders enumerate, reading a 56 KB PDF downloaded it (flag cleared, valid PDF), a Doc `.webloc` holds its docs.google.com URL. 15 DriveAPI + 10 extension tests. Not yet: remote changes (fixed sync anchor until S-10), writes (S-09). | Standard | 2026-10-10 | 2026-10-10 |
 
 ## Verify
 
 - **S-06 Menu-bar sign-in + debug listing** · Standard · started 2026-10-10 · waiting on the human
   - Built and running signed (`build/GDriveBox.app`). Remaining AC: the user signs in once with a passkey and once with another MFA method; the window lists the My Drive root and storage usage.
-- **S-07/S-08 Finder folder: domain, enumeration, on-demand download** · Standard · started 2026-10-10 · waiting on the human
-  - Done: `GDriveBoxFileProvider.appex` (`NSFileProviderReplicatedExtension`, SwiftPM executable entering `NSExtensionMain`) embedded and signed with its own profile; `pluginkit` lists it; app registers domain `google` ("GDriveBox") on sign-in/launch/Refresh → `~/Library/CloudStorage/GDriveBox-GDriveBox` exists. `item(for:)` = `files.get`, folder enumerator pages `files.list` via `NSFileProviderPage`, `fetchContents` = `files.get?alt=media` streamed to a temp file; Google-native docs served as generated `.webloc` links (Jev act 0.98); read-only (capabilities read/enumerate only; create/modify → `NSFeatureUnsupportedError`, delete → `deletionRejected`). Extension reads tokens from the app-group keychain item. 15 DriveAPI + 10 extension tests.
-  - Remaining AC: macOS lists the domain as "user-disabled" until the user turns GDriveBox on (System Settings › General › Login Items & Extensions › File Providers; the window shows a banner + button). Then: `ls ~/Library/CloudStorage/GDriveBox-GDriveBox` lists My Drive root dataless; opening a file downloads it.
-  - Not yet: remote changes (fixed sync anchor until S-10), writes (S-09).
 - **S-12a Sign out** · Standard · started 2026-10-10 · waiting on the human
   - Done: "Sign Out" in the menu and the window header → revoke at `oauth2.googleapis.com/revoke` (400 `invalid_token` = already revoked; offline → local sign-out continues with a notice, Jev act 0.98), delete the keychain item, `NSFileProviderManager.remove(…, mode: .removeAll)`, reset UI. 4 revocation tests.
   - Remaining AC: exercise it on the user's real session (signs them out, so left to the user): domain and folder gone, app shows "Not signed in".
-  - Verify holds 3 cards (limit 2): all three wait on the same human session.
+  - Verify holds 2 cards (limit 2).
 
 ## In Progress (WIP 2)
 
