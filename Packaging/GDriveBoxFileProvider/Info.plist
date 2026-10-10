@@ -1,0 +1,43 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<key>CFBundleDevelopmentRegion</key>
+	<string>en</string>
+	<key>CFBundleDisplayName</key>
+	<string>GDriveBox</string>
+	<key>CFBundleExecutable</key>
+	<string>__EXECUTABLE_NAME__</string>
+	<key>CFBundleIdentifier</key>
+	<string>io.github.ayoinc.GDriveBox.FileProvider</string>
+	<key>CFBundleInfoDictionaryVersion</key>
+	<string>6.0</string>
+	<key>CFBundleName</key>
+	<string>GDriveBoxFileProvider</string>
+	<key>CFBundlePackageType</key>
+	<string>XPC!</string>
+	<key>CFBundleShortVersionString</key>
+	<string>__SHORT_VERSION__</string>
+	<key>CFBundleSupportedPlatforms</key>
+	<array>
+		<string>MacOSX</string>
+	</array>
+	<key>CFBundleVersion</key>
+	<string>__BUNDLE_VERSION__</string>
+	<key>LSMinimumSystemVersion</key>
+	<string>15.0</string>
+	<key>NSExtension</key>
+	<dict>
+		<key>NSExtensionFileProviderDocumentGroup</key>
+		<string>group.io.github.ayoinc.GDriveBox</string>
+		<key>NSExtensionFileProviderSupportsEnumeration</key>
+		<true/>
+		<key>NSExtensionPointIdentifier</key>
+		<string>com.apple.fileprovider-nonui</string>
+		<key>NSExtensionPrincipalClass</key>
+		<string>GDriveBoxFileProviderExtension</string>
+	</dict>
+	<key>NSHumanReadableCopyright</key>
+	<string>Copyright © 2026 Ayodele Ajayi. Licensed under the Apache License 2.0.</string>
+</dict>
+</plist>
