@@ -12,11 +12,36 @@ struct DriveWindow: View {
     var body: some View {
         VStack(spacing: 0) {
             if model.isSignedIn {
-                AccountHeader(account: model.account)
+                AccountHeader(account: model.account, isSigningOut: model.isSigningOut) {
+                    Task { await model.signOut() }
+                }
                 Divider()
             }
             content
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
+            if model.isSignedIn, let problem = model.finderFolderProblem {
+                Divider()
+                Label("\(problem.title): \(problem.message)", systemImage: "exclamationmark.triangle")
+                    .font(.callout)
+                    .foregroundStyle(.secondary)
+                    .padding(8)
+            }
+            if model.isSignedIn, model.finderFolderProblem == nil, model.finderFolderNeedsEnabling {
+                Divider()
+                HStack {
+                    Label(
+                        "Turn on GDriveBox under File Providers in System Settings to see My Drive in Finder, then click Refresh.",
+                        systemImage: "info.circle"
+                    )
+                    .font(.callout)
+                    .foregroundStyle(.secondary)
+                    Spacer()
+                    Button("Open System Settings…") {
+                        NSWorkspace.shared.open(FinderFolder.settingsURL)
+                    }
+                }
+                .padding(8)
+            }
         }
         .frame(minWidth: 520, minHeight: 320)
         .toolbar {
@@ -40,13 +65,15 @@ struct DriveWindow: View {
     private var content: some View {
         if model.isSigningIn {
             ProgressView("Waiting for Google sign-in…")
+        } else if model.isSigningOut {
+            ProgressView("Signing out…")
         } else if let problem = model.sessionProblem {
             ProblemView(problem: problem, signIn: signIn, retry: signIn)
         } else if !model.isSignedIn {
             ContentUnavailableView {
                 Label("Not signed in", systemImage: "person.crop.circle.badge.questionmark")
             } description: {
-                Text("Sign in with Google to list My Drive.")
+                Text(model.notice ?? "Sign in with Google to list My Drive.")
             } actions: {
                 Button("Sign In with Google…", action: signIn)
             }
@@ -75,6 +102,8 @@ struct DriveWindow: View {
 
 private struct AccountHeader: View {
     let account: About?
+    let isSigningOut: Bool
+    let signOut: () -> Void
 
     var body: some View {
         HStack(spacing: 12) {
@@ -92,6 +121,8 @@ private struct AccountHeader: View {
                 Text("Loading account…").foregroundStyle(.secondary)
                 Spacer()
             }
+            Button("Sign Out", action: signOut)
+                .disabled(isSigningOut)
         }
         .padding()
     }

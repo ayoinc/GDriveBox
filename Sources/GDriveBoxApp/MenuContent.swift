@@ -10,11 +10,18 @@ struct MenuContent: View {
 
         Divider()
 
-        Button("Sign In with Google…") {
-            model.requestSignIn()
-            showDriveWindow()
+        if model.isSignedIn {
+            Button("Sign Out") {
+                Task { await model.signOut() }
+            }
+            .disabled(model.isSigningOut)
+        } else {
+            Button("Sign In with Google…") {
+                model.requestSignIn()
+                showDriveWindow()
+            }
+            .disabled(model.isSigningIn)
         }
-        .disabled(model.isSigningIn)
 
         Button("Show My Drive…") {
             showDriveWindow()

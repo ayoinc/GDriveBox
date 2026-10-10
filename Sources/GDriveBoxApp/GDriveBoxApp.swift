@@ -1,4 +1,4 @@
-import DriveAuth
+import GDriveBoxShared
 import SwiftUI
 
 @main
@@ -9,11 +9,7 @@ struct GDriveBoxApp: App {
     // property-wrapper type is used directly (SwiftUI still discovers it as a `DynamicProperty`).
     private let model = State(initialValue: AppModel(
         clientID: Bundle.main.object(forInfoDictionaryKey: "GDBGoogleClientID") as? String,
-        tokenStore: KeychainTokenStore(
-            service: "io.github.ayoinc.GDriveBox",
-            account: "google",
-            accessGroup: "group.io.github.ayoinc.GDriveBox"
-        )
+        tokenStore: SharedConfiguration.tokenStore()
     ))
 
     var body: some Scene {
