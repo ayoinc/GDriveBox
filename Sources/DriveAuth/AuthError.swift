@@ -14,4 +14,6 @@ public enum AuthError: Error, Sendable, Equatable {
     case noAccessToken
     /// A keychain call failed with this `OSStatus`.
     case keychain(OSStatus)
+    /// Google's revocation endpoint answered with this HTTP status.
+    case revocationFailed(status: Int)
 }

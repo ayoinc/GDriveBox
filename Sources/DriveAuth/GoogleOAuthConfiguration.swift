@@ -4,6 +4,7 @@ import Foundation
 public struct GoogleOAuthConfiguration: Sendable, Equatable {
     public static let authorizationEndpoint = URL(string: "https://accounts.google.com/o/oauth2/v2/auth")!
     public static let tokenEndpoint = URL(string: "https://oauth2.googleapis.com/token")!
+    public static let revocationEndpoint = URL(string: "https://oauth2.googleapis.com/revoke")!
     public static let driveScopes = ["openid", "email", "profile", "https://www.googleapis.com/auth/drive"]
 
     private static let clientIDSuffix = ".apps.googleusercontent.com"

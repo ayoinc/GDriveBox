@@ -52,6 +52,34 @@ public actor AuthSession: AccessTokenProvider {
         return token
     }
 
+    /// Revokes the grant at Google, which invalidates the refresh token and every access token
+    /// issued from it. Google answers `400 invalid_token` for a token that is already revoked or
+    /// expired; that counts as success. Does not touch the token store.
+    public func revoke(using transport: any HTTPTransport = URLSessionTransport()) async throws {
+        guard let token = state.refreshToken ?? state.lastTokenResponse?.accessToken else { return }
+        var request = URLRequest(url: GoogleOAuthConfiguration.revocationEndpoint)
+        request.httpMethod = "POST"
+        request.setValue("application/x-www-form-urlencoded", forHTTPHeaderField: "Content-Type")
+        // Form values: everything outside the RFC 3986 unreserved set is percent-encoded ('+' included).
+        let unreserved = CharacterSet(charactersIn: "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-._~")
+        request.httpBody = Data("token=\(token.addingPercentEncoding(withAllowedCharacters: unreserved) ?? token)".utf8)
+
+        let (data, response) = try await transport.send(request)
+        switch response.statusCode {
+        case 200..<300:
+            return
+        case 400 where Self.isInvalidTokenError(data):
+            return
+        default:
+            throw AuthError.revocationFailed(status: response.statusCode)
+        }
+    }
+
+    private static func isInvalidTokenError(_ body: Data) -> Bool {
+        struct Body: Decodable { let error: String }
+        return (try? JSONDecoder().decode(Body.self, from: body))?.error == "invalid_token"
+    }
+
     private static func map(_ error: any Error) -> any Error {
         let nsError = error as NSError
         if nsError.domain == OIDOAuthTokenErrorDomain, nsError.code == OIDErrorCodeOAuthToken.invalidGrant.rawValue {

@@ -1,10 +1,32 @@
 import AppAuth
+import DriveAPI
 import Foundation
 import Synchronization
 import Testing
 @testable import DriveAuth
 
 // MARK: - Fakes
+
+/// Revocation endpoint stub: one canned reply, records the request.
+private final class RevocationEndpoint: HTTPTransport {
+    private let reply: (status: Int, body: String)
+    private let recorded = Mutex<[URLRequest]>([])
+
+    init(status: Int, body: String = "{}") { reply = (status, body) }
+
+    var requests: [URLRequest] { recorded.withLock { $0 } }
+
+    func send(_ request: URLRequest) async throws -> (Data, HTTPURLResponse) {
+        recorded.withLock { $0.append(request) }
+        let response = HTTPURLResponse(url: request.url!, statusCode: reply.status, httpVersion: "HTTP/1.1", headerFields: nil)!
+        return (Data(reply.body.utf8), response)
+    }
+
+    func download(_ request: URLRequest) async throws -> (URL, HTTPURLResponse) {
+        Issue.record("Revocation never downloads")
+        throw URLError(.unsupportedURL)
+    }
+}
 
 /// Token endpoint stub served through AppAuth's real URLSession stack.
 private final class StubTokenEndpoint: URLProtocol {
@@ -153,5 +175,35 @@ private func archivedSignedInState(accessToken: String = "old-token", expiresIn:
 func malformedClientIDsAreRejected(_ clientID: String) {
     #expect(throws: AuthError.invalidClientID(clientID)) {
         try GoogleOAuthConfiguration(clientID: clientID)
+    }
+}
+
+@Test func revokePostsTheRefreshTokenToGoogle() async throws {
+    let endpoint = RevocationEndpoint(status: 200)
+    let session = try AuthSession.start(archivedState: archivedSignedInState(), store: InMemoryTokenStore())
+
+    try await session.revoke(using: endpoint)
+
+    let request = try #require(endpoint.requests.first)
+    #expect(endpoint.requests.count == 1)
+    #expect(request.url == URL(string: "https://oauth2.googleapis.com/revoke"))
+    #expect(request.httpMethod == "POST")
+    #expect(request.value(forHTTPHeaderField: "Content-Type") == "application/x-www-form-urlencoded")
+    #expect(request.httpBody == Data("token=refresh-1".utf8))
+}
+
+@Test func revokeTreatsAnAlreadyInvalidTokenAsRevoked() async throws {
+    let endpoint = RevocationEndpoint(status: 400, body: #"{"error":"invalid_token","error_description":"Token expired or revoked"}"#)
+    let session = try AuthSession.start(archivedState: archivedSignedInState(), store: InMemoryTokenStore())
+
+    try await session.revoke(using: endpoint)
+}
+
+@Test(arguments: [(400, #"{"error":"invalid_request"}"#), (503, "unavailable")])
+func revokeReportsOtherFailures(status: Int, body: String) async throws {
+    let session = try AuthSession.start(archivedState: archivedSignedInState(), store: InMemoryTokenStore())
+
+    await #expect(throws: AuthError.revocationFailed(status: status)) {
+        try await session.revoke(using: RevocationEndpoint(status: status, body: body))
     }
 }
