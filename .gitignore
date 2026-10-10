@@ -12,3 +12,7 @@ DerivedData/
 
 # App bundle output (Scripts/build-app.sh)
 /build/
+
+# Website deploy tooling
+/site/node_modules/
+/site/.wrangler/

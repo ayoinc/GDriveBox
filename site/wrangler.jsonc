@@ -1,0 +1,20 @@
+{
+  "$schema": "./node_modules/wrangler/config-schema.json",
+  "name": "gdrivebox-site",
+  "compatibility_date": "2026-10-01",
+  // The website is the static pages in ../docs.
+  "assets": {
+    "directory": "../docs"
+  },
+  "routes": [
+    { "pattern": "gdrivebox.app", "custom_domain": true },
+    { "pattern": "www.gdrivebox.app", "custom_domain": true }
+  ],
+  "workers_dev": false,
+  "send_email": [
+    {
+      "name": "EMAIL",
+      "remote": true
+    }
+  ]
+}
