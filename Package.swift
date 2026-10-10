@@ -26,7 +26,14 @@ let package = Package(
         // Settings both bundles must agree on (keychain item, app group).
         .target(name: "GDriveBoxShared", dependencies: ["DriveAuth"]),
         .executableTarget(name: "GDriveBoxApp", dependencies: ["DriveAPI", "DriveAuth", "GDriveBoxShared"]),
-        .executableTarget(name: "GDriveBoxFileProvider", dependencies: ["DriveAPI", "DriveAuth", "GDriveBoxShared"]),
+        // An app extension has no `main`: like Xcode, enter Foundation's NSExtensionMain directly.
+        // (ExtensionFoundation calls a `main` symbol if the image has one, so a Swift main that
+        // forwards to NSExtensionMain recurses until the stack overflows.)
+        .executableTarget(
+            name: "GDriveBoxFileProvider",
+            dependencies: ["DriveAPI", "DriveAuth", "GDriveBoxShared"],
+            linkerSettings: [.unsafeFlags(["-Xlinker", "-e", "-Xlinker", "_NSExtensionMain"])]
+        ),
         .testTarget(name: "DriveAPITests", dependencies: ["DriveAPI"]),
         .testTarget(
             name: "DriveAuthTests",
