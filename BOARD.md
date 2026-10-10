@@ -23,8 +23,23 @@ Cycle time = Done date − Started date (calendar days). Track it per class.
 | Decision | Jev lean | Where it lands |
 |---|---|---|
 | Verify WIP limit 2 vs 1 | 2 (0.64) | Policy above; revisit with two weeks of data. |
-| Sign-in reuses the Safari Google session vs. a private (ephemeral) session | reuse (0.64) | `GoogleSignInFlow.signIn(prefersEphemeralSession:)`; choose in S-06. |
-| Commit each card to git when it reaches Done | no lean (0.48) | Nothing committed yet; the human decides. |
+| Sign-in reuses the Safari Google session vs. a private (ephemeral) session | reuse (0.64) | Resolved 2026-10-10: reuse (user asked to plow through decisions; Jev's lean taken). |
+| Commit each card to git when it reaches Done | no lean (0.48) | Resolved 2026-10-10: commit per card, Conventional Commits, pushed to public `ayoinc/GDriveBox` (user chose a public repo). |
+| Create the File Provider extension's provisioning profile now | no (0.27) | Deferred to S-07, when the extension exists. |
+
+## Accounts and identifiers
+
+| Thing | Value |
+|---|---|
+| Apple team | Ayodele Ajayi (Individual), Team ID `T8242XY72S` (user excluded the Kharis Ministries team) |
+| App IDs | `io.github.ayoinc.GDriveBox`, `io.github.ayoinc.GDriveBox.FileProvider` (App Groups enabled) |
+| App group / keychain access group | `group.io.github.ayoinc.GDriveBox` |
+| App Store Connect | GDriveBox, macOS, Apple ID `6821382130`, SKU `gdrivebox-macos`, English (U.K.) |
+| Dev signing | `Apple Development: Ayodele Ajayi (747Y7L4FPC)` (key only in login keychain); this Mac registered; profile "GDriveBox macOS Development" (app only) |
+| Google Cloud | project `gdrivebox-ayoinc`; Drive API enabled; OAuth app **In production**, unverified (100-user lifetime cap, "unverified app" screen) |
+| Google OAuth client (iOS type, public) | `473211601147-pdhd9n52ki3832vaddcsaceo8bktgk4p.apps.googleusercontent.com` |
+| Website | https://gdrivebox.app/ (also www): Cloudflare Worker `gdrivebox-site` serving `docs/` as static assets (`site/wrangler.jsonc`, deploy: `cd site && npx wrangler deploy`); binding `EMAIL` (Send Email) reserved, unused. The old GitHub Pages URLs redirect to gdrivebox.app. |
+| Email | `support@gdrivebox.app` is the only public contact; Cloudflare Email Routing catch-all forwards all `@gdrivebox.app` mail to the owner's inbox. |
 
 ## Done
 
@@ -32,7 +47,10 @@ Cycle time = Done date − Started date (calendar days). Track it per class.
 |---|---|---|---|
 | S-01 Repo bootstrap | Standard | 2026-10-10 | 2026-10-10 |
 | S-02 DriveAPI client — 10 Swift Testing tests (incl. 11-case retry classification); live smoke vs `www.googleapis.com` (real 401 parsed, single forced refresh). Authenticated listing exercised in S-06 (needs B-03). | Standard | 2026-10-10 | 2026-10-10 |
-| S-03 DriveAuth — 8 Swift Testing tests (stubbed token endpoint through AppAuth's HTTP stack); smoke: login-keychain round trip, unsigned data-protection keychain → `-34018`, refresh against real `oauth2.googleapis.com` surfaces `invalid_client`. Interactive passkey/MFA sign-in and a successful real refresh exercised in S-06 (needs B-01, B-03). | Standard | 2026-10-10 | 2026-10-10 |
+| S-03 DriveAuth — 8 Swift Testing tests (stubbed token endpoint through AppAuth's HTTP stack); smoke: login-keychain round trip, unsigned data-protection keychain → `-34018`, refresh against real `oauth2.googleapis.com` surfaces `invalid_client`. Interactive passkey/MFA sign-in and a successful real refresh exercised in S-06. | Standard | 2026-10-10 | 2026-10-10 |
+| A-01 Apple setup — identifiers, app group, App Store Connect record, dev certificate, device, dev profile (all verified in the portal / decoded profile) | Standard | 2026-10-10 | 2026-10-10 |
+| G-01 Google OAuth — project, Drive API, branding, scopes, iOS client, published to production (Audience page shows "In production") | Standard | 2026-10-10 | 2026-10-10 |
+| P-01 Public repo + website — `ayoinc/GDriveBox` public; Pages serves homepage, privacy policy (Limited Use statement), terms (HTTP 200) | Standard | 2026-10-10 | 2026-10-10 |
 
 ## Verify
 
@@ -40,19 +58,16 @@ _(empty)_
 
 ## In Progress (WIP 2)
 
-_(empty)_
+- **S-05′ App bundle without Xcode** · Standard · started 2026-10-10
+  - AC: SwiftPM `GDriveBoxApp` target; `Scripts/build-app.sh` assembles an arm64 `GDriveBox.app`, ad-hoc by default, or signed with `SIGN_IDENTITY` + `PROVISIONING_PROFILE` (entitlements: sandbox, network client, app group, application identifier, team id); room for `.appex` under `Contents/PlugIns`.
+- **S-06 Menu-bar sign-in + debug listing** · Standard · started 2026-10-10
+  - AC: signed app restores/stores the session in the app-group keychain without `-34018`; the user signs in once with a passkey and once with another MFA method; debug window lists the My Drive root and storage usage.
 
 ## Ready
 
-_(empty — remaining Milestone 1 cards are blocked)_
+_(empty)_
 
 ## Backlog
-
-### Milestone 1 — sign in + list My Drive
-- **S-05 Xcode project (XcodeGen)** · Standard · needs B-01, B-02
-  - AC: `project.yml` with menu-bar app + File Provider extension; arm64 only; macOS 15; App Group + keychain group; links SyncCore by path.
-- **S-06 Menu-bar sign-in + debug listing** · Standard · needs B-01, B-03, S-05
-  - AC: sign in once with a passkey and once with another MFA method; a real token refresh succeeds; debug window lists My Drive root; choose the ephemeral-session setting.
 
 ### Milestone 2+
 - **S-04 MetadataStore** · Standard — GRDB SQLite (WAL) in the App Group: items, sync_state (changes pageToken), uploads.
@@ -61,16 +76,19 @@ _(empty — remaining Milestone 1 cards are blocked)_
 - **S-09 Uploads + create/modify/delete** · Standard — multipart ≤ 5 MB, resumable above; delete → Drive Trash.
 - **S-10 Remote change polling** · Standard — 60 s + wake/network/activation; extension alone advances the pageToken.
 - **S-11 Conflicts: keep both** · Standard
-- **S-12 Onboarding, status, sign out (revoke)** · Standard
+- **S-12 Onboarding, status, sign out (revoke)** · Standard — sign-out must delete tokens, the local file list and downloaded copies (promised in the privacy policy).
 - **S-13 Release pipeline** · Standard — Developer ID, notarization, Sparkle, Homebrew cask (arm64, macOS ≥ 15).
 - **I-01 CI** · Intangible — GitHub Actions `swift build` + `swift test` on an Apple-silicon runner.
-- **I-02 README + CONTRIBUTING** · Intangible
+- **I-02 CONTRIBUTING** · Intangible (README shipped with P-01)
 - **I-03 swift-format config** · Intangible
-- **I-04 Test-build flake** · Intangible — with Command Line Tools only, `swift test` (default `swiftbuild` backend) alternates: one run fails with "plugin for module 'TestingMacros' not found", the next passes. `--build-system native` cannot find `Testing` at all. Workaround: re-run. Re-check once Xcode is installed (B-01).
+- **I-04 Test-build flake** · Intangible — with Command Line Tools only, `swift test` (default `swiftbuild` backend) alternates: one run fails with "plugin for module 'TestingMacros' not found", the next passes. `--build-system native` cannot find `Testing` at all. Workaround: re-run.
 
-## Blocked (owner: human)
+## Blocked
 
-- **B-01 Install Xcode** — only Command Line Tools are installed. Unblocks S-05.
-- **B-02 Apple Developer Program** — Team ID, App Group, keychain access group. Unblocks S-05 signing and running the extension.
-- **B-03 Google Cloud OAuth client** — project, enable Drive API, External consent screen (Testing), iOS-type OAuth client → client ID. Unblocks S-06.
-- **B-04 Google restricted-scope verification** — homepage, privacy policy, demo video, "Backup and sync" justification. Unblocks public release (Testing mode: 100 users, 7-day refresh tokens).
+- **B-04 Google restricted-scope verification** (owner: agent + human) — needs: Search Console ownership of `gdrivebox.app` (URL-prefix property, HTML file served from `docs/`), a demo video of the working app showing the consent flow and Drive use (needs S-06/S-08), and the "Backup and sync" scope justification. Until verified: "unverified app" screen and a 100-user lifetime cap.
+- **B-05 Developer ID Application certificate** (owner: agent, in S-13) — needed to sign builds for other people's Macs; Account Holder role confirmed.
+
+## Dropped
+
+- B-01 Install Xcode — user chose the no-Xcode build (2026-10-10).
+- S-05 XcodeGen project — replaced by S-05′.
