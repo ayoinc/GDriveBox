@@ -8,6 +8,8 @@
 	<string>GDriveBox</string>
 	<key>CFBundleExecutable</key>
 	<string>__EXECUTABLE_NAME__</string>
+	<key>CFBundleIconFile</key>
+	<string>AppIcon</string>
 	<key>CFBundleIdentifier</key>
 	<string>io.github.ayoinc.GDriveBox</string>
 	<key>CFBundleInfoDictionaryVersion</key>

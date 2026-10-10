@@ -6,6 +6,8 @@
 #   SIGN_IDENTITY         codesign identity; default "-" (ad-hoc).
 #   PROVISIONING_PROFILE  .provisionprofile embedded as Contents/embedded.provisionprofile. Together
 #                         with a real SIGN_IDENTITY it enables the full entitlements (app group).
+#   PROVISIONING_PROFILE_GDriveBoxFileProvider
+#                         The same for the embedded File Provider extension (its own App ID).
 #   VERSION               CFBundleShortVersionString; default 0.1.0.
 #   BUILD_NUMBER          CFBundleVersion; default 1.
 #
@@ -25,7 +27,7 @@ readonly WORK_DIR="$BUILD_DIR/work"
 # SwiftPM executable products embedded as Contents/PlugIns/<name>.appex. Each one needs
 # Packaging/<name>/Info.plist and Packaging/<name>/<name>.entitlements; its profile comes from
 # PROVISIONING_PROFILE_<name>.
-readonly EXTENSION_PRODUCTS=()
+readonly EXTENSION_PRODUCTS=("GDriveBoxFileProvider")
 
 # Entitlements that only a provisioning profile can authorize.
 readonly PROFILE_GATED_ENTITLEMENTS=(
@@ -76,6 +78,20 @@ assemble_app() {
     fill_info_plist "$PACKAGING/Info.plist" "$APP/Contents/Info.plist" "$APP_NAME"
     printf 'APPL????' >"$APP/Contents/PkgInfo"
     copy_resource_bundles
+    make_app_icon
+}
+
+# Contents/Resources/AppIcon.icns from the 1024 px master Packaging/AppIcon-1024.png.
+make_app_icon() {
+    local master="$PACKAGING/AppIcon-1024.png" iconset="$WORK_DIR/AppIcon.iconset" size
+    [[ -f "$master" ]] || die "app icon not found: $master"
+    rm -rf "$iconset"
+    mkdir -p "$iconset"
+    for size in 16 32 128 256 512; do
+        sips -z "$size" "$size" "$master" --out "$iconset/icon_${size}x${size}.png" >/dev/null
+        sips -z $((size * 2)) $((size * 2)) "$master" --out "$iconset/icon_${size}x${size}@2x.png" >/dev/null
+    done
+    iconutil --convert icns --output "$APP/Contents/Resources/AppIcon.icns" "$iconset"
 }
 
 # SwiftPM resource bundles of the linked packages (AppAuth's privacy manifests).
@@ -87,8 +103,7 @@ copy_resource_bundles() {
     done
 }
 
-# Copies each extension product into Contents/PlugIns/<name>.appex. No-op while
-# EXTENSION_PRODUCTS is empty.
+# Copies each extension product into Contents/PlugIns/<name>.appex.
 embed_extensions() {
     local name appex
     for name in ${EXTENSION_PRODUCTS[@]+"${EXTENSION_PRODUCTS[@]}"}; do
