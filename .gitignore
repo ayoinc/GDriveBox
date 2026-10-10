@@ -9,3 +9,6 @@
 *.xcworkspace/
 xcuserdata/
 DerivedData/
+
+# App bundle output (Scripts/build-app.sh)
+/build/
