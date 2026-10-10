@@ -3,6 +3,9 @@ import Foundation
 /// Sends one HTTP request. Production code uses `URLSessionTransport`; tests inject a scripted fake.
 public protocol HTTPTransport: Sendable {
     func send(_ request: URLRequest) async throws -> (Data, HTTPURLResponse)
+    /// Streams the response body to a new temporary file the caller owns (moves or deletes), so
+    /// large downloads never sit in memory.
+    func download(_ request: URLRequest) async throws -> (URL, HTTPURLResponse)
 }
 
 public struct URLSessionTransport: HTTPTransport {
@@ -18,6 +21,16 @@ public struct URLSessionTransport: HTTPTransport {
             throw DriveError.invalidResponse
         }
         return (data, http)
+    }
+
+    public func download(_ request: URLRequest) async throws -> (URL, HTTPURLResponse) {
+        // Unlike the completion-handler API, the async API leaves the file for the caller.
+        let (file, response) = try await session.download(for: request)
+        guard let http = response as? HTTPURLResponse else {
+            try? FileManager.default.removeItem(at: file)
+            throw DriveError.invalidResponse
+        }
+        return (file, http)
     }
 }
 

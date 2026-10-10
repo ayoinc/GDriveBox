@@ -12,13 +12,15 @@ private struct Reply {
 }
 
 private final class ScriptedTransport: HTTPTransport {
-    private let state: Mutex<(replies: [Reply], requests: [URLRequest])>
+    private let state: Mutex<(replies: [Reply], requests: [URLRequest], downloadedFiles: [URL])>
 
     init(_ replies: [Reply]) {
-        state = Mutex((replies, []))
+        state = Mutex((replies, [], []))
     }
 
     var requests: [URLRequest] { state.withLock { $0.requests } }
+    /// Every temporary file `download` handed out, in order.
+    var downloadedFiles: [URL] { state.withLock { $0.downloadedFiles } }
 
     func send(_ request: URLRequest) async throws -> (Data, HTTPURLResponse) {
         let reply = state.withLock { state -> Reply? in
@@ -31,6 +33,15 @@ private final class ScriptedTransport: HTTPTransport {
         }
         let response = HTTPURLResponse(url: request.url!, statusCode: reply.status, httpVersion: "HTTP/1.1", headerFields: reply.headers)!
         return (Data(reply.body.utf8), response)
+    }
+
+    /// Writes the scripted body to a fresh temporary file, as `URLSession.download(for:)` does.
+    func download(_ request: URLRequest) async throws -> (URL, HTTPURLResponse) {
+        let (data, response) = try await send(request)
+        let file = FileManager.default.temporaryDirectory.appending(path: "ScriptedTransport-\(UUID().uuidString)")
+        try data.write(to: file)
+        state.withLock { $0.downloadedFiles.append(file) }
+        return (file, response)
     }
 }
 
@@ -225,4 +236,66 @@ func retryableClassification(status: Int, reason: String?, retryable: Bool) {
 
 @Test func childrenQueryEscapesStringLiterals() {
     #expect(FileListQuery.children(of: #"a'b\c"#).q == #"'a\'b\\c' in parents and trashed = false"#)
+}
+
+@Test func fileFetchesMetadataByIDIncludingWebViewLink() async throws {
+    let body = #"{"id":"doc1","name":"Plan","mimeType":"application/vnd.google-apps.document","parents":["r0"],"version":"3","modifiedTime":"2026-10-09T08:00:00Z","webViewLink":"https://docs.google.com/document/d/doc1/edit"}"#
+    let transport = ScriptedTransport([Reply(status: 200, body: body)])
+
+    let file = try await makeClient(transport).file(id: "doc1")
+
+    #expect(file.isGoogleNative)
+    #expect(!file.isFolder)
+    #expect(file.webViewLink == URL(string: "https://docs.google.com/document/d/doc1/edit"))
+    let request = try #require(transport.requests.first)
+    #expect(request.url?.path() == "/drive/v3/files/doc1")
+    #expect(queryValue("fields", in: request)?.contains("webViewLink") == true)
+}
+
+@Test func foldersAreNotGoogleNativeDocuments() async throws {
+    let folder = DriveFile(id: "d", name: "d", mimeType: DriveFile.folderMimeType, parents: [], size: nil, md5Checksum: nil, headRevisionId: nil, version: 1, modifiedTime: .now, trashed: false)
+    #expect(!folder.isGoogleNative)
+}
+
+@Test func downloadStreamsMediaToATemporaryFile() async throws {
+    let transport = ScriptedTransport([Reply(status: 200, body: "hello bytes")])
+
+    let file = try await makeClient(transport).download(fileID: "f1")
+    defer { try? FileManager.default.removeItem(at: file) }
+
+    #expect(try Data(contentsOf: file) == Data("hello bytes".utf8))
+    let request = try #require(transport.requests.first)
+    #expect(request.url?.path() == "/drive/v3/files/f1")
+    #expect(queryValue("alt", in: request) == "media")
+    #expect(request.value(forHTTPHeaderField: "Authorization") == "Bearer token-1")
+}
+
+@Test func downloadRefreshesOnceOnUnauthorizedAndDeletesTheErrorBody() async throws {
+    let transport = ScriptedTransport([
+        Reply(status: 401, body: googleError(401, reason: "authError", status: "UNAUTHENTICATED")),
+        Reply(status: 200, body: "fresh"),
+    ])
+    let tokens = CountingTokens()
+
+    let file = try await makeClient(transport, tokens: tokens).download(fileID: "f1")
+    defer { try? FileManager.default.removeItem(at: file) }
+
+    #expect(try Data(contentsOf: file) == Data("fresh".utf8))
+    #expect(tokens.forceRefreshFlags == [false, true])
+    let errorBodyFile = try #require(transport.downloadedFiles.first)
+    #expect(!FileManager.default.fileExists(atPath: errorBodyFile.path()))
+}
+
+@Test func downloadOfGoogleNativeDocumentFailsWithParsedErrorAndLeavesNoFile() async throws {
+    let transport = ScriptedTransport([
+        Reply(status: 403, body: googleError(403, reason: "fileNotDownloadable", status: "PERMISSION_DENIED")),
+    ])
+    let sleeps = SleepRecorder()
+
+    await #expect(throws: DriveError.http(status: 403, error: GoogleAPIError(code: 403, message: "fileNotDownloadable happened", reasons: ["fileNotDownloadable"], status: "PERMISSION_DENIED"))) {
+        try await makeClient(transport, sleeps: sleeps).download(fileID: "doc1")
+    }
+    #expect(sleeps.recorded.isEmpty)
+    let errorBodyFile = try #require(transport.downloadedFiles.first)
+    #expect(!FileManager.default.fileExists(atPath: errorBodyFile.path()))
 }

@@ -3,11 +3,13 @@ import Foundation
 /// A Drive file or folder with the fields the sync engine tracks.
 public struct DriveFile: Sendable, Equatable, Decodable {
     public static let folderMimeType = "application/vnd.google-apps.folder"
+    /// Prefix of Google-native types (Docs, Sheets, Slides, shortcuts, …) that have no binary content.
+    public static let googleNativeMimeTypePrefix = "application/vnd.google-apps."
     /// Drive's alias for the root folder of My Drive.
     public static let myDriveRootID = "root"
 
     /// Partial-response field mask matching the stored properties.
-    static let fieldMask = "id,name,mimeType,parents,size,md5Checksum,headRevisionId,version,modifiedTime,trashed"
+    static let fieldMask = "id,name,mimeType,parents,size,md5Checksum,headRevisionId,version,modifiedTime,trashed,webViewLink"
 
     public let id: String
     public let name: String
@@ -23,8 +25,12 @@ public struct DriveFile: Sendable, Equatable, Decodable {
     public let version: Int64
     public let modifiedTime: Date
     public let trashed: Bool
+    /// The file's page in the Drive web UI; nil when Drive omits it.
+    public let webViewLink: URL?
 
     public var isFolder: Bool { mimeType == Self.folderMimeType }
+    /// A Google Doc, Sheet, Slides deck, or other Drive-native item that `alt=media` cannot download.
+    public var isGoogleNative: Bool { !isFolder && mimeType.hasPrefix(Self.googleNativeMimeTypePrefix) }
 
     public init(
         id: String,
@@ -36,7 +42,8 @@ public struct DriveFile: Sendable, Equatable, Decodable {
         headRevisionId: String?,
         version: Int64,
         modifiedTime: Date,
-        trashed: Bool
+        trashed: Bool,
+        webViewLink: URL? = nil
     ) {
         self.id = id
         self.name = name
@@ -48,10 +55,11 @@ public struct DriveFile: Sendable, Equatable, Decodable {
         self.version = version
         self.modifiedTime = modifiedTime
         self.trashed = trashed
+        self.webViewLink = webViewLink
     }
 
     private enum CodingKeys: String, CodingKey {
-        case id, name, mimeType, parents, size, md5Checksum, headRevisionId, version, modifiedTime, trashed
+        case id, name, mimeType, parents, size, md5Checksum, headRevisionId, version, modifiedTime, trashed, webViewLink
     }
 
     public init(from decoder: any Decoder) throws {
@@ -66,6 +74,7 @@ public struct DriveFile: Sendable, Equatable, Decodable {
         version = try c.decodeInt64String(forKey: .version)
         modifiedTime = try c.decodeRFC3339Date(forKey: .modifiedTime)
         trashed = try c.decodeIfPresent(Bool.self, forKey: .trashed) ?? false
+        webViewLink = try c.decodeIfPresent(URL.self, forKey: .webViewLink)
     }
 }
 

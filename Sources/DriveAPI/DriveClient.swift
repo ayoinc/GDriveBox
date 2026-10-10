@@ -44,6 +44,22 @@ public struct DriveClient: Sendable {
         return try await get("files", query: items)
     }
 
+    /// Metadata of one file or folder (`files.get`). `DriveFile.myDriveRootID` returns the My Drive
+    /// root with its real ID.
+    public func file(id: String) async throws -> DriveFile {
+        try await get("files/\(id)", query: [URLQueryItem(name: "fields", value: DriveFile.fieldMask)])
+    }
+
+    /// Downloads a file's bytes (`files.get?alt=media`) into a new temporary file the caller owns.
+    /// Google-native documents have no bytes; Drive rejects them with 403 `fileNotDownloadable`.
+    public func download(fileID: String) async throws -> URL {
+        let url = try makeURL(path: "files/\(fileID)", query: [URLQueryItem(name: "alt", value: "media")])
+        return try await send(url, accept: nil, using: transport.download) { file in
+            defer { try? FileManager.default.removeItem(at: file) }
+            return (try? Data(contentsOf: file)) ?? Data()
+        }
+    }
+
     /// Every file matching `query`, fetching pages lazily. Cancelling iteration stops fetching.
     public func allFiles(_ query: FileListQuery) -> AsyncThrowingStream<DriveFile, any Error> {
         AsyncThrowingStream { continuation in
@@ -66,6 +82,23 @@ public struct DriveClient: Sendable {
 
     private func get<Response: Decodable>(_ path: String, query: [URLQueryItem]) async throws -> Response {
         let url = try makeURL(path: path, query: query)
+        let data = try await send(url, accept: "application/json", using: transport.send) { $0 }
+        do {
+            return try JSONDecoder().decode(Response.self, from: data)
+        } catch {
+            throw DriveError.decoding(String(describing: error))
+        }
+    }
+
+    /// Sends an authorized GET through `exchange`, refreshing the token once on 401 and backing off
+    /// on retryable failures. `discardFailure` turns a failed response's body into bytes for error
+    /// parsing and releases whatever the body holds.
+    private func send<Body>(
+        _ url: URL,
+        accept: String?,
+        using exchange: (URLRequest) async throws -> (Body, HTTPURLResponse),
+        discardFailure: (Body) -> Data
+    ) async throws -> Body {
         var forceRefresh = false
         var refreshedAfterUnauthorized = false
         var retries = 0
@@ -76,20 +109,14 @@ public struct DriveClient: Sendable {
 
             var request = URLRequest(url: url)
             request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
-            request.setValue("application/json", forHTTPHeaderField: "Accept")
+            if let accept { request.setValue(accept, forHTTPHeaderField: "Accept") }
 
-            let (data, response) = try await transport.send(request)
+            let (body, response) = try await exchange(request)
             let status = response.statusCode
 
-            if (200..<300).contains(status) {
-                do {
-                    return try JSONDecoder().decode(Response.self, from: data)
-                } catch {
-                    throw DriveError.decoding(String(describing: error))
-                }
-            }
+            if (200..<300).contains(status) { return body }
 
-            let apiError = GoogleAPIError(body: data)
+            let apiError = GoogleAPIError(body: discardFailure(body))
 
             if status == 401 {
                 guard !refreshedAfterUnauthorized else { throw DriveError.unauthorized(apiError) }
